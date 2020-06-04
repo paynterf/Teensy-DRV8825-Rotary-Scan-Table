@@ -1,31 +1,22 @@
 /*
-    Name:       Teensy_DRV8825_Rotary_Scan_Table.ino
-    Created:	6/4/2020 12:59:57 AM
-    Author:     FRANKNEWXPS15\Frank
-*/
-
-/*
-	Name:       Teensy_NEMA17_L298N_RotaryTable.ino
-	Created:	5/27/2020 11:00:40 AM
+	Name:       Teensy_DRV8825_Rotary_Scan_Table.ino
+	Created:	6/4/2020 12:59:57 AM
 	Author:     FRANKNEWXPS15\Frank
 */
 
 /*
-Teensy NEMA 17 L298N Rotary Table Program
+Teensy DRV8825 Rotary Table Program
 
-This program controls a NEMA 17 stepper motor using an L298N motor driver. It
+This program controls a NEMA 17 stepper motor using a Pololu DRV8825 motor driver. It
 Takes user input to define the boresight (zero) position and the start and stop angles
 in degrees relative to the zero position.  Then it moves to the start position and waits
 for a HIGH level on SCAN_START_PIN.  After this signal is received, the motor is
 stepped through to the stop position. At the stop position, the SCAN_COMPLETE_PIN is
 driven HIGH.
 
-The Stepper motor is connected to an L298N motor driver with one coil on Out1/2, and the
-other coil on Out3/4.  It may turn out that one coil's leads have to be reversed to match
+The Stepper motor is connected to a DRV8825 motor driver with one coil on A1/A2, and the
+other coil on B1/B2.  It may turn out that one coil's leads have to be reversed to match
 the motor rotation direction with the program direction.
-
-The Teensy 3.2 is connect to In1/2/3/4 via pins 8,9,10,11 although this can be changed in the
-constructor below.
 
 The NEMA 17 motor is assumed to execute 200 steps/revolution.  Change the StepsPerRevolution
 constant for other values.
@@ -36,7 +27,7 @@ However, if the STEP_ENABLE_PIN (held HIGH by default) is pulled LOW, the progra
 until it goes HIGH before performing the next step.  In this case, a scan iteration would go
 as follows
 
-	Step 1 - Scan paramaters entered, motor moves to start position, waits for LOW on SCAN_START_PIN
+	Step 1 - Scan parameters entered, motor moves to start position, waits for LOW on SCAN_START_PIN
 	Step 2 - Measurement program pulls SCAN_START_PIN LOW for 1 sec, then back HIGH
 	Step 3 - Measurement program takes a measurement & retrieves step# & angle value via I2C request
 	Step 4 - Measurement program pulls SCAN_STEP_ENABLE_PIN LOW
@@ -50,7 +41,6 @@ as follows
 //O5/30/20 Added I2C connection to pass step# & relative angle values to measurement program
 //05/02/20 Rev to use Pololu DRV8825 & micro-stepping
 
-//#include <Stepper.h>
 #include <Wire.h>
 #include "I2C_Anything.h"
 #include "DRV8825.h"

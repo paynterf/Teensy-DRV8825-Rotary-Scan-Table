@@ -24,5 +24,8 @@
     <ClInclude Include="I2C_Anything.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="__vm\.Teensy-DRV8825-Rotary-Scan-Table.vsarduino.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
