@@ -29,4 +29,8 @@ as follows
 	Step 7 - Measurement program takes a measurement & retrieves step# & angle value via I2C request
 	Step 8 - Repeat Steps 4-7 until scan complete
 	Step 9 - SCAN_COMPLETE_PIN goes HIGH
-*/
+	
+
+07 June 2020:
+Revised the program to allow user to (R)repeat the current scan, start a (N)new one, or (Q)quit the program
+
