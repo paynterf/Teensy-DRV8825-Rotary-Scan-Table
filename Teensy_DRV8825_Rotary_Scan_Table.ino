@@ -40,6 +40,7 @@ as follows
 
 //O5/30/20 Added I2C connection to pass step# & relative angle values to measurement program
 //05/02/20 Rev to use Pololu DRV8825 & micro-stepping
+//06/07/20 Rev to allow scan parameter changes w/o having to rebuild the project
 
 #include <Wire.h>
 #include "I2C_Anything.h"
@@ -93,7 +94,10 @@ int curAngleStepVal; //keeps track of current table step iteration value
 bool bStopPosDone = false;
 int scanSpeedRpm = 6;
 
-
+//06/07/20 added for new scan parameter edit feature
+bool bRepeating = true;
+double scanStepDeg = 0; 
+int scanTotDeg = 0;
 
 void setup()
 {
@@ -144,53 +148,26 @@ void setup()
 	//added 05/26/20
 	Serial.printf("Serial.printf: NEMA-17 Stepper Rotary Table Program\n");
 
-	//get motor speed to be used
-	scanSpeedRpm = GetIntegerParameter("Motor speed RPM", 6);
+}
 
+void loop()
+{
+	//06/07/20 moved everything into loop() so can repeat scans with parameter edit if desired
 
-	//set zero position
-	Serial.println("Set stepper zero position.  Enter +steps for CW, -steps for CCW, Q to exit");
-	while (!bStopPosDone)
-	{
-		while (Serial.available() == 0); //waits for input
-		if (toascii(Serial.peek()) == 'Q' || toascii(Serial.peek()) == 'q')
-		{
-			bStopPosDone = true;
-			curMotorStepVal = 0;
-		}
-		else
-		{
-			stepsToMove = GetIntegerParameter("Steps to move (- = CCW, + = CW)?", DEFAULT_MOTOR_STEPS_TO_MOVE);
-			Serial.print("Steps to move = "); Serial.println(stepsToMove);
-			stepper.setRPM(POSITIONING_SPEED_RPM);
-			stepper.move(stepsToMove);
-		}
-	}
-
-	Serial.readString(); //clear the input buffer - could still have chars in it
-	Serial.print("curMotorStepVal = "); Serial.println(curMotorStepVal);
-
-	//set scan start/stop positions in degrees
-	scanStartDeg = GetIntegerParameter("Scan Start Pos in Degrees Relative to Zero", -90);
-	scanStopDeg = GetIntegerParameter("Scan Stop Pos in Degrees Relative to Zero", 90);
-	scanNumberofSteps = GetIntegerParameter("Number of Steps", 18);
-	curRelPointingAngleDeg = scanStartDeg; //added 05/30/20
-
-	Serial.println("Run Parameters:");
-	Serial.print("Speed: "); Serial.print(scanSpeedRpm); Serial.println(" RPM");
-	Serial.print("Scan Start: "); Serial.print(scanStartDeg); Serial.println(" Deg");
-	Serial.print("Scan Stop: "); Serial.print(scanStopDeg); Serial.println(" Deg");
-	Serial.print("Scan Steps: "); Serial.println(scanNumberofSteps);
+	//06/07/20 rev to use a function for scan parameter capture
+	GetScanParameters();
 
 	//06/02/20 Now using Pololu DRV8825 driver & microstepping
-	int scandeg = abs(scanStopDeg - scanStartDeg);
-	double scanstepdeg = scandeg / scanNumberofSteps;
+	scanTotDeg = abs(scanStopDeg - scanStartDeg);
+	scanStepDeg = scanTotDeg / scanNumberofSteps;
 
 	//go to scan start pos
 	stepper.setRPM(POSITIONING_SPEED_RPM);
 	stepper.rotate(scanStartDeg);
 
-	while (1)  //user has opportunity to exit after each scan
+	//while (1)  //user has opportunity to exit after each scan
+	bRepeating = true;
+	while (bRepeating)  //user has opportunity to exit after each scan
 	{
 		//wait for trigger
 		Serial.printf("waiting for LOW on SCAN_START_PIN (pin %d) ...\n", SCAN_START_PIN);
@@ -199,14 +176,14 @@ void setup()
 			delay(100);
 		}
 
-		Serial.println("Scan Triggered - starting scan, setting SCAN_COMPLETE_PIN to LOW\n");
+		Serial.printf("Scan Triggered - starting scan, setting SCAN_COMPLETE_PIN (pin %d) to LOW\n", SCAN_COMPLETE_PIN);
 		digitalWrite(SCAN_COMPLETE_PIN, LOW);
 
 		stepper.setRPM(scanSpeedRpm);
 
 		for (curAngleStepVal = 1; curAngleStepVal <= scanNumberofSteps; curAngleStepVal++)
 		{
-			curRelPointingAngleDeg = scanStartDeg + (curAngleStepVal)*scanstepdeg;
+			curRelPointingAngleDeg = scanStartDeg + (curAngleStepVal)*scanStepDeg;
 
 			//when SCAN_STEP_ENABLE_PIN goes LOW, go to first/next step.
 			while (digitalRead(SCAN_STEP_ENABLE_PIN))
@@ -214,12 +191,12 @@ void setup()
 
 			}
 
-			unsigned long now = millis();
+			//unsigned long now = millis();
 			digitalWrite(SCAN_STEP_COMPLETE_PIN, LOW);
 			Serial.printf("Scan Step %d Triggered: moving to %3.2f deg\n", curAngleStepVal, curRelPointingAngleDeg);
 
 			//DRV8825
-			stepper.rotate(scanstepdeg); //rotate to next scan angle
+			stepper.rotate(scanStepDeg); //rotate to next scan angle
 
 			//output HIGH on SCAN_STEP_COMPLETE_PIN
 //DEBUG!!
@@ -239,32 +216,70 @@ void setup()
 		//return to start position
 		//DRV8825
 		stepper.setRPM(POSITIONING_SPEED_RPM);
-		stepper.rotate(-scandeg);
+		stepper.rotate(-scanTotDeg);
 
 		//re-initialize step counter and current pointing angle
 		curAngleStepVal = 0;
 		curRelPointingAngleDeg = scanStartDeg;
 
-		Serial.printf("Enter any key to continue\n");
+		Serial.printf("Enter R to repeat this scan, N for a new scan, Q to quit the programe\n");
 		while (!Serial.available())
 		{
-
 		}
 
-		//consume bytes until Serial buffer is empty to avoid unintended triggers
+		//06/07/2020 rev to allow user to Repeat the current scan, start a new scan, or quit
+#pragma region USER_INPUT
 		int incomingByte;
-		while (Serial.available())
+		bool bDoneWithInput = false;
+		while (!bDoneWithInput)
 		{
-			incomingByte = Serial.read();
-			Serial.printf("Consuming 0x%x\n", incomingByte);
+			if (Serial.available() > 0)
+			{
+				// read the incoming byte:
+				incomingByte = Serial.read();
+
+				// say what you got:
+				//Serial.printf("I received: 0x%x\n", incomingByte);
+
+				//02/18/20 experiment with multiple commands
+				switch (incomingByte)
+				{
+				case 0x52: //ASCII 'R' Repeat current scan
+				case 0x72: //ASCII 'r'
+					Serial.printf("Repeat Current Scan\n");
+					bRepeating = true;
+					bDoneWithInput = true;
+					break;
+				case 0x4E: //ASCII 'N' New Scan
+				case 0x6E: //ASCII 'n'
+					Serial.printf("New Scan\n");
+					bRepeating = false;
+					bDoneWithInput = true;
+					break;
+				case 0x51: //ASCII 'Q' Quit the program
+				case 0x71: //ASCII 'q'
+					Serial.printf("Stopping Program - Have a Nice Day!\n");
+					while (1);
+					break;
+				default:
+					Serial.printf("Please enter a Q, R, or N\n");
+					bDoneWithInput = false;
+					bDoneWithInput = false;
+					break;
+				}
+
+				//clear out any remaining characters from Serial buffer
+				while (Serial.available())
+				{
+					incomingByte = Serial.read();
+					//Serial.printf("Consuming 0x%x\n", incomingByte);
+				}
+			}
+
 		}
+#pragma endregion Check for incoming character
 
 	}
-}
-
-
-void loop()
-{
 }
 
 int GetIntegerParameter(String prompt, int defaultval)
@@ -344,3 +359,47 @@ void requestEvent()
 	I2C_writeAnything(curAngleStepVal);
 	I2C_writeAnything(curRelPointingAngleDeg);
 }
+
+//06/07/20 added to encapsulate scan parameter acquisition
+void GetScanParameters()
+{
+	//get motor speed to be used
+	scanSpeedRpm = GetIntegerParameter("Motor speed RPM", 6);
+
+
+	//set zero position
+	Serial.println("Set stepper zero position.  Enter +steps for CW, -steps for CCW, Q to exit");
+	while (!bStopPosDone)
+	{
+		while (Serial.available() == 0); //waits for input
+		if (toascii(Serial.peek()) == 'Q' || toascii(Serial.peek()) == 'q')
+		{
+			bStopPosDone = true;
+			curMotorStepVal = 0;
+		}
+		else
+		{
+			stepsToMove = GetIntegerParameter("Steps to move (- = CCW, + = CW)?", DEFAULT_MOTOR_STEPS_TO_MOVE);
+			Serial.print("Steps to move = "); Serial.println(stepsToMove);
+			stepper.setRPM(POSITIONING_SPEED_RPM);
+			stepper.move(stepsToMove);
+		}
+	}
+
+	Serial.readString(); //clear the input buffer - could still have chars in it
+	Serial.print("curMotorStepVal = "); Serial.println(curMotorStepVal);
+
+	//set scan start/stop positions in degrees
+	scanStartDeg = GetIntegerParameter("Scan Start Pos in Degrees Relative to Zero", -90);
+	scanStopDeg = GetIntegerParameter("Scan Stop Pos in Degrees Relative to Zero", 90);
+	scanNumberofSteps = GetIntegerParameter("Number of Steps", 18);
+	curRelPointingAngleDeg = scanStartDeg; //added 05/30/20
+
+	Serial.println("Run Parameters:");
+	Serial.print("Speed: "); Serial.print(scanSpeedRpm); Serial.println(" RPM");
+	Serial.print("Scan Start: "); Serial.print(scanStartDeg); Serial.println(" Deg");
+	Serial.print("Scan Stop: "); Serial.print(scanStopDeg); Serial.println(" Deg");
+	Serial.print("Scan Steps: "); Serial.println(scanNumberofSteps);
+
+}
+
