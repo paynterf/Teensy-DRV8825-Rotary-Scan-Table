@@ -52,12 +52,14 @@ const int SLAVE_ADDR = 8; //added 05/30/20
  // Motor steps per revolution. Most steppers are 200 steps or 1.8 degrees/step
 //06/02/20 now using Pololu DRV8825
 const int MOTOR_STEPS_PER_REV = 200;
-const int MICROSTEPS_PER_STEP = 32;
+//const int MICROSTEPS_PER_STEP = 32;
+const int MICROSTEPS_PER_STEP = 1; //full step mode
 const int MICROSTEPS_PER_REV = MICROSTEPS_PER_STEP * MOTOR_STEPS_PER_REV;
-const int DEG_PER_MICROSTEP = 360 / MICROSTEPS_PER_REV;
+const float DEG_PER_MICROSTEP = 360 /(float)MICROSTEPS_PER_REV;
 const int MICROSTEPS_PER_DEG = MICROSTEPS_PER_REV / 360;
 const int DEFAULT_RPM = 12;
-const int POSITIONING_SPEED_RPM = 100;
+//const int POSITIONING_SPEED_RPM = 100;
+const int POSITIONING_SPEED_RPM = 20;
 const int DEFAULT_MOTOR_STEPS_TO_MOVE = 10;
 #pragma endregion Motor Constants
 
@@ -99,6 +101,12 @@ bool bRepeating = true;
 double scanStepDeg = 0; 
 int scanTotDeg = 0;
 
+//06/08/20 added for rotator precision debug
+int motorStepsPerScanStep;
+int motorStepsToStartPos;
+int curMotorSteps = 0;
+
+
 void setup()
 {
 	//added 05/30/20 to provide step# & angle values to Angle Scan program
@@ -121,7 +129,7 @@ void setup()
 	 * The motor should rotate just as fast (at the set RPM),
 	 * but movement precision is increased, which may become visually apparent at lower RPMs.
 	 */
-	stepper.setMicrostep(MICROSTEPS_PER_STEP);   // Set microstep mode to 1:32
+	stepper.setMicrostep(MICROSTEPS_PER_STEP);   // Set microstep mode
 
 
 
@@ -160,10 +168,16 @@ void loop()
 	//06/02/20 Now using Pololu DRV8825 driver & microstepping
 	scanTotDeg = abs(scanStopDeg - scanStartDeg);
 	scanStepDeg = scanTotDeg / scanNumberofSteps;
+	motorStepsPerScanStep = roundf(scanStepDeg / DEG_PER_MICROSTEP);
+	Serial.printf("scanTotDeg = %d, scanStepDeg = %2.3f, motorStepsPerScanStep = %d\n", scanTotDeg, scanStepDeg, motorStepsPerScanStep);
 
 	//go to scan start pos
 	stepper.setRPM(POSITIONING_SPEED_RPM);
-	stepper.rotate(scanStartDeg);
+	//stepper.rotate(scanStartDeg);
+	motorStepsToStartPos = roundf(scanStartDeg / DEG_PER_MICROSTEP);
+	Serial.printf("Start position is %d steps from zero position\n", motorStepsToStartPos);
+	stepper.move(motorStepsToStartPos);
+	curMotorSteps = motorStepsToStartPos; //safe to overwrite previous value here
 
 	//while (1)  //user has opportunity to exit after each scan
 	bRepeating = true;
@@ -196,7 +210,10 @@ void loop()
 			Serial.printf("Scan Step %d Triggered: moving to %3.2f deg\n", curAngleStepVal, curRelPointingAngleDeg);
 
 			//DRV8825
-			stepper.rotate(scanStepDeg); //rotate to next scan angle
+			//stepper.rotate(scanStepDeg); //rotate to next scan angle
+			stepper.move(motorStepsPerScanStep);
+			curMotorSteps += motorStepsPerScanStep;
+			Serial.printf("Motor now at %d steps\n", curMotorSteps);
 
 			//output HIGH on SCAN_STEP_COMPLETE_PIN
 //DEBUG!!
@@ -210,19 +227,25 @@ void loop()
 
 		//quit
 		Serial.printf("Outputting HIGH on SCAN_COMPLETE_PIN (pin %d)\n", SCAN_COMPLETE_PIN);
+		Serial.printf("After scan completion motor at %d steps\n", curMotorSteps);
 
 		digitalWrite(SCAN_COMPLETE_PIN, HIGH);
 
 		//return to start position
 		//DRV8825
+		delay(1000);
 		stepper.setRPM(POSITIONING_SPEED_RPM);
-		stepper.rotate(-scanTotDeg);
+		//stepper.rotate(-scanTotDeg);
+		Serial.printf("motorStepsToStartPos = %d, curMotorSteps = %d, steps to start pos = %d\n",
+			motorStepsToStartPos, curMotorSteps, motorStepsToStartPos - curMotorSteps);
+		stepper.move(motorStepsToStartPos - curMotorSteps);
+		curMotorSteps = motorStepsToStartPos; //reset curMotorSteps
 
 		//re-initialize step counter and current pointing angle
 		curAngleStepVal = 0;
 		curRelPointingAngleDeg = scanStartDeg;
 
-		Serial.printf("Enter R to repeat this scan, N for a new scan, Q to quit the programe\n");
+		Serial.printf("Enter R to repeat this scan, N for a new scan, Q to quit the program\n");
 		while (!Serial.available())
 		{
 		}
@@ -368,6 +391,7 @@ void GetScanParameters()
 
 
 	//set zero position
+	bStopPosDone = false;
 	Serial.println("Set stepper zero position.  Enter +steps for CW, -steps for CCW, Q to exit");
 	while (!bStopPosDone)
 	{
