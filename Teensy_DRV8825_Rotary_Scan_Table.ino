@@ -41,6 +41,7 @@ as follows
 //O5/30/20 Added I2C connection to pass step# & relative angle values to measurement program
 //05/02/20 Rev to use Pololu DRV8825 & micro-stepping
 //06/07/20 Rev to allow scan parameter changes w/o having to rebuild the project
+//06/11/20 Rev to incorporate some rotation precision debugging code
 
 #include <Wire.h>
 #include "I2C_Anything.h"
