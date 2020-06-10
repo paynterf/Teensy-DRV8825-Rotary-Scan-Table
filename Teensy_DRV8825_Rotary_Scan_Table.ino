@@ -136,7 +136,6 @@ void setup()
 
 
 	Serial.begin(115200);
-	unsigned long now = millis();
 	while (!Serial)
 	{
 		delay(10);
@@ -144,7 +143,7 @@ void setup()
 
 	delay(5000); //05/28/20 delay AFTER Serial object instantiation is NECESSARY!
 
-	Serial.print("Serial available after "); Serial.print(millis() - now); Serial.print(" millisec");
+	//Serial.printf("Serial available after %lu millisec\n",millis() - now); 
 
 	pinMode(SCAN_START_PIN, INPUT_PULLUP);
 	pinMode(SCAN_STEP_ENABLE_PIN, INPUT_PULLUP);
@@ -156,7 +155,7 @@ void setup()
 	digitalWrite(SCAN_STEP_COMPLETE_PIN, LOW);
 
 	//added 05/26/20
-	Serial.printf("Serial.printf: NEMA-17 Stepper Rotary Table Program\n");
+	Serial.printf("NEMA-17 Stepper Rotary Table Program\n");
 
 }
 
@@ -169,16 +168,18 @@ void loop()
 
 	//06/02/20 Now using Pololu DRV8825 driver & microstepping
 	scanTotDeg = abs(scanStopDeg - scanStartDeg);
-	scanStepDeg = scanTotDeg / scanNumberofSteps;
+	scanStepDeg = (float)scanTotDeg / (float)scanNumberofSteps;
 	motorStepsPerScanStep = roundf(scanStepDeg / DEG_PER_MICROSTEP);
 	Serial.printf("scanTotDeg = %d, scanStepDeg = %2.3f, motorStepsPerScanStep = %d\n", scanTotDeg, scanStepDeg, motorStepsPerScanStep);
 
 	//go to scan start pos
 	stepper.setRPM(POSITIONING_SPEED_RPM);
-	//stepper.rotate(scanStartDeg);
+	stepper.rotate(scanStartDeg);
 	motorStepsToStartPos = roundf(scanStartDeg / DEG_PER_MICROSTEP);
-	Serial.printf("Start position is %d steps from zero position\n", motorStepsToStartPos);
-	stepper.move(motorStepsToStartPos);
+	Serial.printf("scanStartDeg = %d\n", scanStartDeg);
+	Serial.printf("Start Position is %d steps and %d deg from zero position\n", motorStepsToStartPos, scanStartDeg);
+	Serial.printf("scanStartDeg = %d\n", scanStartDeg);
+	//stepper.move(motorStepsToStartPos);
 	curMotorSteps = motorStepsToStartPos; //safe to overwrite previous value here
 
 	//while (1)  //user has opportunity to exit after each scan
@@ -207,15 +208,15 @@ void loop()
 
 			}
 
-			//unsigned long now = millis();
 			digitalWrite(SCAN_STEP_COMPLETE_PIN, LOW);
 			Serial.printf("Scan Step %d Triggered: moving to %3.2f deg\n", curAngleStepVal, curRelPointingAngleDeg);
 
 			//DRV8825
-			//stepper.rotate(scanStepDeg); //rotate to next scan angle
-			stepper.move(motorStepsPerScanStep);
+			stepper.rotate(scanStepDeg); //rotate to next scan angle
+			//stepper.move(motorStepsPerScanStep);
 			curMotorSteps += motorStepsPerScanStep;
-			Serial.printf("Motor now at %d steps\n", curMotorSteps);
+			//Serial.printf("Motor now at %d steps\n", curMotorSteps);
+			Serial.printf("Motor now at %d steps and %3.2f degrees\n", curMotorSteps, curRelPointingAngleDeg);
 
 			//output HIGH on SCAN_STEP_COMPLETE_PIN
 //DEBUG!!
