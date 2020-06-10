@@ -53,11 +53,13 @@ const int SLAVE_ADDR = 8; //added 05/30/20
 //06/02/20 now using Pololu DRV8825
 const int MOTOR_STEPS_PER_REV = 200;
 //const int MICROSTEPS_PER_STEP = 32;
-const int MICROSTEPS_PER_STEP = 1; //full step mode
+//const int MICROSTEPS_PER_STEP = 1; //full step mode
+//const int MICROSTEPS_PER_STEP = 2; //half step mode
+//const int MICROSTEPS_PER_STEP = 8;
+const int MICROSTEPS_PER_STEP = 32;
 const int MICROSTEPS_PER_REV = MICROSTEPS_PER_STEP * MOTOR_STEPS_PER_REV;
 const float DEG_PER_MICROSTEP = 360 /(float)MICROSTEPS_PER_REV;
-const int MICROSTEPS_PER_DEG = MICROSTEPS_PER_REV / 360;
-const int DEFAULT_RPM = 12;
+const int DEFAULT_RPM = 6;
 //const int POSITIONING_SPEED_RPM = 100;
 const int POSITIONING_SPEED_RPM = 20;
 const int DEFAULT_MOTOR_STEPS_TO_MOVE = 10;
