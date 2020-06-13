@@ -221,13 +221,14 @@ void loop()
 
 			//output HIGH on SCAN_STEP_COMPLETE_PIN
 //DEBUG!!
-			//Serial.printf("Outputting HIGH on SCAN_STEP_COMPLETE_PIN\n");
+			Serial.printf("Outputting HIGH on SCAN_STEP_COMPLETE_PIN (%d)\n", SCAN_STEP_COMPLETE_PIN);
 			//Serial.printf("Done in %lu Msec - Current Angle = %3.2f\n", millis() - now, curRelPointingAngleDeg);
 //DEBUG!!
 
 			digitalWrite(SCAN_STEP_COMPLETE_PIN, HIGH);
-			//delay(50);  //make the HIGH period visible on scope
+			delay(500);  //make the HIGH period visible on scope
 		}
+
 
 		//quit
 		Serial.printf("Outputting HIGH on SCAN_COMPLETE_PIN (pin %d)\n", SCAN_COMPLETE_PIN);
